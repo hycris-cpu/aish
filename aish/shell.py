@@ -54,6 +54,8 @@ def _save_history(mode: str):
 
 def _run_shell(cmd: str) -> int:
     """Execute a bash command, streaming output."""
+    import time
+    start = time.time()
     try:
         proc = subprocess.Popen(
             cmd, shell=True, stdout=subprocess.PIPE,
@@ -63,7 +65,14 @@ def _run_shell(cmd: str) -> int:
             sys.stdout.write(line)
             sys.stdout.flush()
         proc.wait()
-        return proc.returncode
+        rc = proc.returncode
+        # Record in history
+        try:
+            from .history import record as hist_record
+            hist_record("", cmd, rc, time.time() - start)
+        except Exception:
+            pass
+        return rc
     except KeyboardInterrupt:
         print("^C")
         return -1

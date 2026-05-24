@@ -101,6 +101,27 @@ def cmd_config(args):
             print(f"  [{p.get('hits', 0):3d}] {p['input'][:50]:50s} → {p['command'][:50]}")
         return
 
+    if args.config_cmd in ("memory", "remember"):
+        from .memory import list_all, add, remove, clear
+        sub = getattr(args, 'key', None)
+        val = getattr(args, 'value', None)
+        if sub == "show" or not sub:
+            print("Aish memories:")
+            for m in list_all():
+                print(f"  • {m['fact']}")
+        elif sub == "add" and val:
+            add(val)
+            print(f"✓ Remembered: {val}")
+        elif sub == "remove" and val:
+            if remove(val):
+                print(f"✓ Forgotten: {val}")
+            else:
+                print(f"Not found: {val}")
+        elif sub == "clear":
+            clear()
+            print("✓ All memories cleared")
+        return
+
     # Interactive wizard
     print("aish configuration (press Enter to keep current)\n")
     try:
@@ -168,68 +189,186 @@ def cmd_one_shot(args):
 
 
 def main():
-    # Manual dispatch: handle `aish config ...` vs one-shot text
-    # without argparse subparser conflicts
-    if len(sys.argv) > 1 and sys.argv[1] == "config":
-        args = sys.argv[2:]
+    # Manual dispatch: handle `aish config ...` etc. vs one-shot text
+    args_list = sys.argv[1:] if len(sys.argv) > 1 else []
+
+    if not args_list:
+        # Interactive shell
+        cfg = load_config()
+        _check_key_and_run(cfg, start_ai=False)
+        return
+
+    cmd = args_list[0]
+
+    if cmd == "config":
         # Build config parser
         cp = argparse.ArgumentParser(prog="aish config")
         cp.add_argument("config_cmd", nargs="?",
-                        choices=["show", "set", "providers", "test", "learned"],
+                        choices=["show", "set", "providers", "test", "learned", "memory", "remember"],
                         help="Config subcommand (omit for wizard)")
         cp.add_argument("key", nargs="?", help="Config key")
         cp.add_argument("value", nargs="?", help="Config value")
         cp.add_argument("--text", "-t", default=None, help="Test text")
-        pargs = cp.parse_args(args)
-        # Wrap in a namespace-like object for compatibility
+        pargs = cp.parse_args(args_list[1:])
         cmd_config(pargs)
         return
 
-    parser = argparse.ArgumentParser(
-        prog="aish",
-        description="AI Shell — type natural language, run bash commands",
-        formatter_class=argparse.RawDescriptionHelpFormatter,
-        epilog=textwrap.dedent("""\
-            Examples:
-              aish                          Interactive shell (bash mode)
-              aish --ai                     Interactive shell (AI mode)
-              aish "find large files"       One-shot: translate + run
-              aish config show              Show current config
-              aish config set provider deepseek
-              aish config set model deepseek-chat
-              aish config test "show disk usage"
-
-            Providers built-in:
-              deepseek, openai, openrouter, anthropic, gemini, ollama, llamacpp
-
-            Environment variables:
-              NLSH_API_KEY          API key (takes priority)
-              DEEPSEEK_API_KEY      Auto-detected for deepseek provider
-              OPENAI_API_KEY        Auto-detected for openai provider
-              OPENROUTER_API_KEY    Auto-detected for openrouter provider
-              etc. per provider
-        """),
-    )
-    parser.add_argument(
-        "--version", action="version", version=f"aish {__version__}"
-    )
-    parser.add_argument("--ai", action="store_true",
-                        help="Start in AI mode (instead of bash mode)")
-    parser.add_argument("text", nargs="*",
-                        help="Natural language input (one-shot mode)")
-    parser.add_argument("-y", "--yes", action="store_true",
-                        help="Auto-confirm command execution")
-
-    args = parser.parse_args()
-
-    # One-shot mode: positional text given
-    if args.text:
-        cmd_one_shot(args)
+    elif cmd == "skill":
+        # Skill commands
+        sub = args_list[1] if len(args_list) > 1 else "list"
+        if sub == "list":
+            from .skill import list_skills
+            skills = list_skills()
+            if not skills:
+                print("No skills saved.")
+                return
+            print(f"{'Name':<20} {'NL Input':<40} {'Command':<40} {'Hits':<6}")
+            print("-" * 110)
+            for s in skills:
+                print(f"{s['name']:<20} {s.get('nl_input','')[:38]:<40} {s['command'][:38]:<40} {s.get('hits',0):<6}")
+        elif sub == "save" and len(args_list) >= 3:
+            name = args_list[2]
+            nl = " ".join(args_list[3:]) or name
+            # Use one-shot translation to get the command, then save
+            cfg = load_config()
+            from .llm import translate
+            from .skill import save as skill_save
+            if len(args_list) > 3 and args_list[3] != "--cmd":
+                cmd_text, err = translate(nl, cfg.api_key, cfg.base_url, cfg.model)
+                if err or not cmd_text:
+                    print(f"✗ Could not translate: {err}")
+                    return
+                result = skill_save(name, nl, cmd_text)
+                print(f"✓ {result}")
+                print(f"  Command: {cmd_text}")
+            else:
+                # --cmd flag: direct command save
+                cmd_text = " ".join(args_list[4:]) if len(args_list) > 4 else input("Command: ")
+                result = skill_save(name, nl, cmd_text)
+                print(f"✓ {result}")
+        elif sub == "run" and len(args_list) >= 3:
+            from .skill import run as skill_run
+            cmd = skill_run(args_list[2])
+            if cmd:
+                from .shell import _run_shell as run
+                print(f"  {cmd}")
+                run(cmd)
+            else:
+                print(f"✗ Skill '{args_list[2]}' not found")
+        elif sub == "delete" and len(args_list) >= 3:
+            from .skill import delete as skill_delete
+            if skill_delete(args_list[2]):
+                print(f"✓ Deleted skill '{args_list[2]}'")
+            else:
+                print(f"✗ Skill '{args_list[2]}' not found")
+        else:
+            print("Usage: aish skill [list|save <name> [nl]|run <name>|delete <name>]")
         return
 
-    # Interactive shell
+    elif cmd == "cron":
+        sub = args_list[1] if len(args_list) > 1 else "list"
+        if sub == "list":
+            from .cron import list_jobs
+            jobs = list_jobs()
+            if not jobs:
+                print("No scheduled jobs.")
+                return
+            import time
+            print(f"{'Name':<20} {'Command':<30} {'Schedule':<15} {'Next Run':<25}")
+            print("-" * 95)
+            for j in jobs:
+                next_t = j.get('next_run', 0)
+                next_str = time.ctime(next_t) if next_t else "N/A"
+                print(f"{j['name']:<20} {j['command'][:28]:<30} {j.get('schedule',''):<15} {next_str:<25}")
+        elif sub == "add" and len(args_list) >= 4:
+            from .cron import add as cron_add
+            name = args_list[2]
+            sched = args_list[3]
+            cmd_text = " ".join(args_list[4:]) if len(args_list) > 4 else input("Command: ")
+            result = cron_add(name, cmd_text, sched)
+            print(f"✓ {result}")
+        elif sub == "remove" and len(args_list) >= 3:
+            from .cron import remove as cron_remove
+            if cron_remove(args_list[2]):
+                print(f"✓ Removed job '{args_list[2]}'")
+            else:
+                print(f"✗ Job '{args_list[2]}' not found")
+        else:
+            print("Usage: aish cron [list|add <name> <schedule> <command>|remove <name>]")
+        return
+
+    elif cmd == "history":
+        query = " ".join(args_list[1:]) if len(args_list) > 1 else ""
+        from .history import search, recent, stats
+        if query in ("--clear", "clear"):
+            from .history import clear as hist_clear
+            hist_clear()
+            print("✓ History cleared")
+            return
+        if query in ("--stats", "stats"):
+            s = stats()
+            print(f"Total commands: {s['total']}")
+            print(f"Unique commands: {s['unique_commands']}")
+            return
+        if query:
+            results = search(query)
+        else:
+            results = recent(20)
+        if not results:
+            print("No history found.")
+            return
+        import time
+        for r in results:
+            ts = time.strftime("%H:%M:%S", time.localtime(r['time']))
+            cmd = r['command'][:60]
+            nl = r.get('nl_input', '')
+            nl_s = f"[{nl[:30]}] " if nl else ""
+            print(f"  {ts} {nl_s}{cmd}")
+        return
+
+    elif cmd == "remember":
+        fact = " ".join(args_list[1:])
+        if fact:
+            from .memory import add as mem_add
+            mem_add(fact)
+            print(f"✓ Remembered: {fact}")
+        else:
+            from .memory import list_all
+            mems = list_all()
+            if not mems:
+                print("No memories saved. Use: aish remember <fact>")
+            else:
+                print("Aish memories:")
+                for m in mems:
+                    print(f"  • {m['fact']}")
+        return
+
+    # One-shot mode: positional text given
     cfg = load_config()
+    # Check for -y flag (auto-confirm)
+    auto_yes = "-y" in args_list or "--yes" in args_list
+    text_parts = [a for a in args_list if not a.startswith("-")]
     
+    if text_parts:
+        # Call one-shot with args
+        class MockArgs:
+            def __init__(self, text, yes):
+                self.text = text
+                self.yes = yes
+        cmd_one_shot(MockArgs(text=text_parts, yes=auto_yes))
+    else:
+        # Check --ai flag
+        start_ai = "--ai" in args_list
+        if "--version" in args_list:
+            from . import __version__
+            print(f"aish {__version__}")
+            return
+        _check_key_and_run(cfg, start_ai=start_ai)
+    return
+
+
+def _check_key_and_run(cfg, text="", start_ai=False):
+    """Check API key and run shell or one-shot."""
     # Skip API key check for local providers (no api_key_env)
     from .config import get_provider, BUILTIN_PROVIDERS
     needs_key = any(
@@ -245,7 +384,11 @@ def main():
         print("  Or set env: export NLSH_API_KEY=<your-key>")
         sys.exit(1)
 
-    run_shell(cfg, start_ai=args.ai)
+    if text:
+        args = type('Args', (), {'text': text.split(), 'yes': False})()
+        cmd_one_shot(args)
+    else:
+        run_shell(cfg, start_ai=start_ai)
 
 
 if __name__ == "__main__":

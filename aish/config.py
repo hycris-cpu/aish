@@ -96,6 +96,11 @@ class AishConfig:
     api_key: str = ""
     base_url: str = "http://localhost:18098/v1"
     model: str = "Qwen3-0.6B-Q8_0.gguf"
+    # Fallback provider for multi-model retry
+    fallback_provider: str = ""
+    fallback_base_url: str = ""
+    fallback_model: str = ""
+    fallback_api_key: str = ""
 
 
 def load_config() -> AishConfig:
@@ -110,6 +115,10 @@ def load_config() -> AishConfig:
             cfg.api_key = data.get("api_key", cfg.api_key)
             cfg.base_url = data.get("base_url", cfg.base_url)
             cfg.model = data.get("model", cfg.model)
+            cfg.fallback_provider = data.get("fallback_provider", cfg.fallback_provider)
+            cfg.fallback_base_url = data.get("fallback_base_url", cfg.fallback_base_url)
+            cfg.fallback_model = data.get("fallback_model", cfg.fallback_model)
+            cfg.fallback_api_key = data.get("fallback_api_key", cfg.fallback_api_key)
         except (json.JSONDecodeError, OSError):
             pass
 
@@ -147,6 +156,10 @@ def save_config(cfg: AishConfig):
         "api_key": cfg.api_key,
         "base_url": cfg.base_url,
         "model": cfg.model,
+        "fallback_provider": cfg.fallback_provider,
+        "fallback_base_url": cfg.fallback_base_url,
+        "fallback_model": cfg.fallback_model,
+        "fallback_api_key": cfg.fallback_api_key,
     }, indent=2))
 
 

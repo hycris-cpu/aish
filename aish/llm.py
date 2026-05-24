@@ -19,6 +19,8 @@ import requests as req
 
 from .config import BUILTIN_PROVIDERS, load_config
 from .learn import recall, learn
+from .skill import match_nl, run as run_skill
+from .memory import format_prompt as fmt_memory
 
 # ═══════════════════════════════════════════════════════════════════════
 # SYSTEM PROMPT — tight, focused, with tool descriptions
@@ -161,12 +163,17 @@ def _scan_dangerous(command: str) -> Optional[str]:
 
 def _call_llm(user_input: str, api_key: str, base_url: str, model: str,
               max_tokens: int = 256, system_override: str = None) -> tuple[Optional[str], Optional[str]]:
-    """Call the LLM with the system prompt."""
+    """Call the LLM with the system prompt + memory."""
     headers = {"Content-Type": "application/json"}
     if api_key:
         headers["Authorization"] = f"Bearer {api_key}"
 
-    sp = system_override or SYSTEM_PROMPT
+    base = system_override or SYSTEM_PROMPT
+    # Inject user memories into prompt
+    memory_suffix = fmt_memory()
+    if memory_suffix:
+        base = base.rstrip() + memory_suffix
+
     try:
         resp = req.post(
             f"{base_url.rstrip('/')}/chat/completions",
@@ -174,7 +181,7 @@ def _call_llm(user_input: str, api_key: str, base_url: str, model: str,
             json={
                 "model": model,
                 "messages": [
-                    {"role": "system", "content": sp},
+                    {"role": "system", "content": base},
                     {"role": "user", "content": user_input},
                 ],
                 "temperature": 0.0,
@@ -225,7 +232,16 @@ def translate(nl_input: str, api_key: str, base_url: str, model: str,
             print("  [aish] Chat query detected")
         return None, None  # caller handles this
 
-    # ── Step 0b: Recall learned pattern ──
+    # ── Step 0b: Check named skills ──
+    skill_match = match_nl(text)
+    if skill_match:
+        name, cmd = skill_match
+        if verbose:
+            print(f"  [aish] Skill matched: {name} → {cmd}")
+        dangerous = _scan_dangerous(cmd)
+        return (dangerous or cmd), None
+
+    # ── Step 0c: Recall learned pattern ──
     learned_cmd = recall(text)
     if learned_cmd:
         if verbose:
@@ -298,5 +314,21 @@ def translate(nl_input: str, api_key: str, base_url: str, model: str,
             learn(text, final_cmd)
 
         return final_cmd, None
+
+    # ── Step 5: Multi-model fallback ──
+    cfg = load_config()
+    if cfg.fallback_base_url and cfg.fallback_model:
+        if verbose:
+            print(f"  [aish] Trying fallback: {cfg.fallback_provider or 'custom'}...")
+        fb_key = cfg.fallback_api_key or cfg.api_key
+        fb_result, fb_err = _call_llm(text, fb_key, cfg.fallback_base_url, cfg.fallback_model)
+        if fb_result and not fb_err and not fb_result.upper().startswith("ERROR"):
+            if verbose:
+                print(f"  [aish] Fallback succeeded: {fb_result[:60]}")
+            dangerous = _scan_dangerous(fb_result)
+            learn(text, fb_result)
+            return (dangerous or fb_result), None
+        if verbose:
+            print(f"  [aish] Fallback also failed: {fb_err or fb_result[:60] if fb_result else 'no result'}")
 
     return None, f"Cannot translate: '{text}'"
