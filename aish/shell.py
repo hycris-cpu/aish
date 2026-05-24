@@ -183,6 +183,7 @@ def _print_help():
 [bold]AI mode:[/bold]
   [cyan]<anything>[/cyan]  Natural language → bash command
   [cyan]!command[/cyan]    Run raw bash without AI
+  [cyan]/listen[/cyan]     Voice input: speak → transcribe → run
   [cyan]$var[/cyan]        Environment variables work as in bash
 
 [bold]Bash mode:[/bold]
