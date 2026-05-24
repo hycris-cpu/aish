@@ -125,6 +125,10 @@ def _handle_ai(text: str, config: AishConfig):
 
     command, err = translate(text, config.api_key, config.base_url,
                              config.model)
+    # Chat-only query (no command needed)
+    if err is None and command is None:
+        return
+
     if err:
         if RICH:
             con.print(f"[red]✗[/red] {err}")
