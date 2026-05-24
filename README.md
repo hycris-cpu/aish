@@ -47,6 +47,8 @@ aish -y "update all packages"    # auto-confirm
 aish                             # interactive shell
 ```
 
+**Built on a 0.6B model** — 610 MB Q8_0, runs instantly on any hardware.
+
 **No cloud? No problem.** aish works with local models too:
 
 ```bash
@@ -208,8 +210,8 @@ User request
 
 | Component | Size | Role |
 |-----------|------|------|
-| **Qwen3-0.6B** GGUF | 610 MB | NL→Bash translation |
-| **whisper tiny.en** | 28 MB | Voice→Text |
+| **Qwen3-0.6B** (default) | **610 MB** Q8_0 | NL→Bash translation engine |
+| **whisper tiny.en** (optional) | 28 MB | Voice→Text |
 | **llama.cpp** | — | Local inference server |
 | **aish** (Python) | 436 KB | CLI + harness + tools |
 
