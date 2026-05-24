@@ -357,11 +357,15 @@ def main():
                 self.yes = yes
         cmd_one_shot(MockArgs(text=text_parts, yes=auto_yes))
     else:
-        # Check --ai flag
+        # Check flags
         start_ai = "--ai" in args_list
+        listen_mode = "--listen" in args_list
         if "--version" in args_list:
             from . import __version__
             print(f"aish {__version__}")
+            return
+        if listen_mode:
+            _listen_and_run(cfg)
             return
         _check_key_and_run(cfg, start_ai=start_ai)
     return
@@ -389,6 +393,33 @@ def _check_key_and_run(cfg, text="", start_ai=False):
         cmd_one_shot(args)
     else:
         run_shell(cfg, start_ai=start_ai)
+
+
+def _listen_and_run(cfg):
+    """Listen → transcribe → translate → run (one-shot voice mode)."""
+    from .voice import listen_and_transcribe
+    from .llm import translate
+    from .shell import _run_shell
+
+    text = listen_and_transcribe(duration=5)
+    if not text:
+        print("No speech detected.")
+        return
+
+    print(f"  You said: {text}")
+
+    command, err = translate(text, cfg.api_key, cfg.base_url, cfg.model)
+    if err:
+        print(f"✗ {err}")
+        return
+    if command is None:
+        print("(chat)")
+        return
+
+    print(f"  {command}")
+    ans = input("Run? (Y/n) ").strip().lower() or "y"
+    if ans in ("y", "yes", ""):
+        _run_shell(command)
 
 
 if __name__ == "__main__":

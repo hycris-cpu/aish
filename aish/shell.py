@@ -287,6 +287,16 @@ def run_shell(config: AishConfig, start_ai: bool = False):
                     print("→ AI mode")
             continue
         if raw.startswith("/"):
+            if raw == "/listen":
+                from .voice import listen_and_transcribe
+                print("  Listening for 5s... (speak now)")
+                voice_text = listen_and_transcribe(duration=5)
+                if voice_text:
+                    print(f"  You said: {voice_text}")
+                    _handle_ai(voice_text, config)
+                else:
+                    print("  No speech detected.")
+                continue
             print(f"Unknown: {raw}  (try /help)")
             continue
 
