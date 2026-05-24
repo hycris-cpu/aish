@@ -17,5 +17,10 @@ Thumbs.db
 *.swp
 *.swo
 
-# Config with potential secrets
-.config/aish/config.json
+# Secrets and config
+.config/
+*.env
+.env.*
+credentials*
+*.pem
+*.key
