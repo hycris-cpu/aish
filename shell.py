@@ -13,6 +13,3 @@
 # You should have received a copy of the GNU Affero General Public License
 # along with this program.  If not, see <https://www.gnu.org/licenses/>.
 
-"""aish — AI Shell: type natural language, run bash commands."""
-
-__version__ = "0.1.0"
