@@ -55,7 +55,7 @@ aish config set provider deepseek
 aish config set model deepseek-chat
 
 # Or set your API key
-aish config set api-key sk-xxxxx
+aish config set api-key <your-api-key>
 
 # Test it works
 aish config test "list running docker containers"
@@ -63,7 +63,7 @@ aish config test "list running docker containers"
 
 Or set environment variables (auto-detected per provider):
 ```bash
-export DEEPSEEK_API_KEY=sk-xxxxx
+export DEEPSEEK_API_KEY=<your-key>
 ```
 
 ## Built-in providers
@@ -106,7 +106,7 @@ aish config show             # Current settings
 aish config set provider deepseek
 aish config set model deepseek-chat
 aish config set base-url https://api.deepseek.com/v1
-aish config set api-key sk-xxxxx
+aish config set api-key <your-api-key>
 aish config providers        # List built-in providers
 aish config test "show disk" # Quick API test
 aish config learned          # Show auto-learned patterns
