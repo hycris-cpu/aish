@@ -193,12 +193,20 @@ def main():
     args_list = sys.argv[1:] if len(sys.argv) > 1 else []
 
     if not args_list:
+        # Check for --help
+        if "--help" in sys.argv or "-h" in sys.argv:
+            _print_help()
+            return
         # Interactive shell
         cfg = load_config()
         _check_key_and_run(cfg, start_ai=False)
         return
 
     cmd = args_list[0]
+
+    if cmd in ("--help", "-h"):
+        _print_help()
+        return
 
     if cmd == "config":
         # Build config parser
@@ -393,6 +401,84 @@ def _check_key_and_run(cfg, text="", start_ai=False):
         cmd_one_shot(args)
     else:
         run_shell(cfg, start_ai=start_ai)
+
+
+def _print_help():
+    """Print comprehensive help."""
+    print(textwrap.dedent("""\
+        aish 0.1.0 — AI Shell: type natural language, run bash commands
+
+        USAGE:
+          aish [FLAGS] [TEXT]
+
+        FLAGS:
+          --help, -h     Show this help
+          --version      Show version
+          --ai           Start interactive shell in AI mode
+          --listen       Voice input: record 5s → transcribe → run
+          -y             Auto-confirm command execution
+
+        ONE-SHOT MODE:
+          aish "show disk space"
+          aish -y "update all packages"
+
+        INTERACTIVE SHELL:
+          aish           Start shell (bash mode)
+          aish --ai      Start shell in AI mode
+            /ai /a       Switch to AI mode
+            /bash /b     Switch to bash mode
+            /listen      Voice input (record 5s)
+            /help /?     Show help
+            /exit /q     Quit
+
+        VOICE INPUT:
+          aish --listen  Record 5s → auto-transcribe → run
+
+        CONFIG:
+          aish config              Interactive wizard
+          aish config show         Current settings
+          aish config set provider llamacpp
+          aish config set model Qwen3-0.6B-Q8_0.gguf
+          aish config set api-key <key>
+          aish config set base-url http://localhost:18098/v1
+          aish config providers    List built-in providers
+          aish config test "cmd"   Quick API test
+          aish config learned      Show auto-learned patterns
+          aish config memory       Show/remember user preferences
+
+        SKILLS (saved workflows):
+          aish skill list
+          aish skill save <name> [NL description]
+          aish skill run <name>
+          aish skill delete <name>
+
+        CRON (scheduled tasks):
+          aish cron list
+          aish cron add <name> <schedule> <command>
+            Schedule examples: hourly, daily, weekly, "every 2h"
+          aish cron remove <name>
+
+        HISTORY:
+          aish history               Recent commands
+          aish history <keyword>     Search
+          aish history --stats       Statistics
+          aish history --clear       Clear all
+
+        MEMORY:
+          aish remember <fact>       Save a preference
+          aish remember              Show all memories
+
+        BUILT-IN PROVIDERS:
+          deepseek, openai, openrouter, anthropic
+          gemini, ollama, llamacpp, custom
+
+        ENV VARS:
+          NLSH_API_KEY          API key (takes priority)
+          DEEPSEEK_API_KEY      Auto-detected for deepseek
+
+        LEARN MORE:
+          https://github.com/hycris-cpu/aish
+    """))
 
 
 def _listen_and_run(cfg):
