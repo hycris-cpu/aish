@@ -97,6 +97,12 @@ OVERRIDES: list[tuple[re.Pattern, callable]] = [
     (re.compile(r'^(extract|untar)\s+(\S+\.tar\.gz)', re.IGNORECASE),
      lambda m: f"tar -xzf {m.group(2)}"),
 
+    # Network - process on port
+    (re.compile(r'(what|which)\s+(server|process|app|service|port)\s+is\s+(on|using|running|listening)\D*(\d{3,5})', re.IGNORECASE),
+     lambda m: f"ss -tlnp | grep :{m.group(4)}"),
+    (re.compile(r'find\s+(the\s+)?(what|which)\s+(server|process|app|service|port)\s+is\s+(on|using|running|listening)\D*(\d{3,5}).*', re.IGNORECASE),
+     lambda m: f"ss -tlnp | grep :{m.group(5)}"),
+
     # Permissions
     (re.compile(r'^make\s+(\S+)\s+executable', re.IGNORECASE),
      lambda m: f"chmod +x {m.group(1)}"),
