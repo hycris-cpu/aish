@@ -47,7 +47,7 @@ aish -y "update all packages"    # auto-confirm
 aish                             # interactive shell
 ```
 
-**Built on a 0.6B model** — 610 MB Q8_0, runs instantly on any hardware.
+**Built on a 0.6B model** — lightweight, runs instantly on any hardware.
 
 **No cloud? No problem.** aish works with local models too:
 
