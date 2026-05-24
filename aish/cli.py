@@ -91,6 +91,16 @@ def cmd_config(args):
         print(f"  {command}")
         return
 
+    if args.config_cmd == "learned":
+        from .learn import list_learned, stats
+        patterns = list_learned()
+        s = stats()
+        print(f"Learned patterns: {s['total']} (total hits: {s['total_hits']})")
+        print("-" * 60)
+        for p in sorted(patterns, key=lambda x: x.get("hits", 0), reverse=True):
+            print(f"  [{p.get('hits', 0):3d}] {p['input'][:50]:50s} → {p['command'][:50]}")
+        return
+
     # Interactive wizard
     print("aish configuration (press Enter to keep current)\n")
     try:
@@ -165,7 +175,7 @@ def main():
         # Build config parser
         cp = argparse.ArgumentParser(prog="aish config")
         cp.add_argument("config_cmd", nargs="?",
-                        choices=["show", "set", "providers", "test"],
+                        choices=["show", "set", "providers", "test", "learned"],
                         help="Config subcommand (omit for wizard)")
         cp.add_argument("key", nargs="?", help="Config key")
         cp.add_argument("value", nargs="?", help="Config value")

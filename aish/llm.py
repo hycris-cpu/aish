@@ -18,6 +18,7 @@ from typing import Optional
 import requests as req
 
 from .config import BUILTIN_PROVIDERS, load_config
+from .learn import recall, learn
 
 # ═══════════════════════════════════════════════════════════════════════
 # SYSTEM PROMPT — tight, focused, with tool descriptions
@@ -224,6 +225,14 @@ def translate(nl_input: str, api_key: str, base_url: str, model: str,
             print("  [aish] Chat query detected")
         return None, None  # caller handles this
 
+    # ── Step 0b: Recall learned pattern ──
+    learned_cmd = recall(text)
+    if learned_cmd:
+        if verbose:
+            print(f"  [aish] Learned pattern found: {learned_cmd}")
+        dangerous = _scan_dangerous(learned_cmd)
+        return (dangerous or learned_cmd), None
+
     # ── Step 1: Override rules ──
     for pattern, builder in OVERRIDES:
         m = pattern.match(text)
@@ -272,8 +281,22 @@ def translate(nl_input: str, api_key: str, base_url: str, model: str,
                 print("  [aish] Output looks like prose, retrying...")
             continue
 
+        # Validate: don't echo the prompt back
+        if attempt == 0 and result.strip().lower() == text.lower():
+            if verbose:
+                print("  [aish] Output echoes prompt, retrying...")
+            continue
+
         # ── Step 3: Danger scan ──
         dangerous = _scan_dangerous(result)
-        return (dangerous or result), None
+        final_cmd = dangerous or result
+
+        # ── Step 4: Learn if retry succeeded ──
+        if attempt == 1:
+            if verbose:
+                print(f"  [aish] Learning pattern: {text[:40]} → {final_cmd[:40]}")
+            learn(text, final_cmd)
+
+        return final_cmd, None
 
     return None, f"Cannot translate: '{text}'"
