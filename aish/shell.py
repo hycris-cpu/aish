@@ -223,7 +223,7 @@ def _get_hostname() -> str:
 
 def _prompt(user: str, host: str, cwd: str, mode: str) -> str:
     """Build a zsh-style prompt string."""
-    short = cwd.replace(Path.home(), "~")
+    short = cwd.replace(str(Path.home()), "~")
     colors = {"bash": "green", "ai": "cyan"}
     c = colors.get(mode, "white")
     return (f"[bold]{user}[/bold][dim]@[/dim][bold]{host}[/bold] "
